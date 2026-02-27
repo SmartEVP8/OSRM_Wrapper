@@ -31,6 +31,7 @@ add_library(osrm_wrapper SHARED
 target_include_directories(osrm_wrapper PRIVATE
     ${osrm_backend_SOURCE_DIR}/include
     ${osrm_backend_SOURCE_DIR}/include/osrm
+    ${osrm_backend_SOURCE_DIR}/third_party/flatbuffers/include
     ${osrm_backend_SOURCE_DIR}/third_party/variant/include
     ${osrm_backend_SOURCE_DIR}/third_party/stxxl/include
     ${Boost_INCLUDE_DIRS}
