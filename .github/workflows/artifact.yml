@@ -6,6 +6,9 @@ on:
     tags:
       - 'v*'  # Trigger on release tags like v1.0.0
 
+permissions:
+  contents: write
+
 jobs:
   build-linux:
     name: Build Linux / WSL
@@ -39,7 +42,7 @@ jobs:
           mkdir -p package
           cp build/libosrm_wrapper.so package/
           cp *.hpp package/
-          tar czf osrm_cpp_wrapper-macos.tar.gz -C package .
+          tar czf osrm_cpp_wrapper-linux.tar.gz -C package .
 
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v2        
