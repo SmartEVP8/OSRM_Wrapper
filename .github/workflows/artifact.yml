@@ -29,7 +29,8 @@ jobs:
             libtbb-dev libstxxl-dev \
             lua5.3 liblua5.3-dev \
             libbz2-dev libexpat1-dev \
-            flatbuffers-compiler libflatbuffers-dev
+            flatbuffers-compiler libflatbuffers-dev \
+            libzstd-dev liblzma-dev
 
       - name: Build
         run: |
@@ -60,7 +61,7 @@ jobs:
       - name: Install dependencies
         run: |
           brew update
-          brew install cmake boost tbb lua bzip2 expat flatbuffers
+          brew install cmake boost tbb lua bzip2 expat flatbuffers zstd xz
 
       - name: Build
         run: |
