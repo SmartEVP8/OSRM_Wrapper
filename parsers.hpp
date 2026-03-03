@@ -36,4 +36,5 @@ ParseNearest(const osrm::engine::api::ResultT &result);
 std::optional<TableRowResult>
 ParseTable(const osrm::engine::api::ResultT &result);
 
-std::optional<float> ParseRoute(const osrm::engine::api::ResultT &result);
+std::optional<std::pair<float, std::string>>
+ParseRoute(const osrm::engine::api::ResultT &result);
