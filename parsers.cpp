@@ -41,38 +41,29 @@ ParseNearest(const osrm::engine::api::ResultT &result) {
   return out;
 }
 
-std::optional<float> ParseRoute(const osrm::engine::api::ResultT &result) {
+std::optional<std::pair<float, std::string>>
+ParseRoute(const osrm::engine::api::ResultT &result) {
   using namespace jsonutil;
 
   auto *root = std::get_if<Object>(&result);
-  if (!root) {
+  if (!root)
     return std::nullopt;
-  }
 
   const Array *routes = jsonutil::getArray(*root, "routes");
-  if (!routes) {
+  if (!routes || routes->values.empty())
     return std::nullopt;
-  }
-  if (routes->values.empty()) {
-    return std::nullopt;
-  }
 
   const Object *route0 = std::get_if<Object>(&routes->values[0]);
-  if (!route0) {
+  if (!route0)
     return std::nullopt;
-  }
 
   const Number *duration = jsonutil::getNumber(*route0, "duration");
-  if (!duration) {
-    for (const auto &kv : route0->values) {
-      std::cout << kv.first << " ";
-    }
-    std::cout << "\n";
-    return std::nullopt;
-  }
+  const String *polyline = jsonutil::getString(*route0, "geometry");
 
-  float dur = static_cast<float>(duration->value);
-  return dur;
+  if (!duration || !polyline)
+    return std::nullopt;
+
+  return std::make_pair(static_cast<float>(duration->value), polyline->value);
 }
 
 std::optional<TableRowResult>

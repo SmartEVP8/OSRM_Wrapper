@@ -12,6 +12,13 @@
 #include <optional>
 #include <vector>
 
+extern "C" {
+struct RouteResult {
+  float duration;
+  char *polyline;
+};
+}
+
 static std::vector<std::optional<osrm::engine::Hint>> persistentHints;
 static std::vector<osrm::util::Coordinate> persistentCoords;
 
@@ -57,9 +64,8 @@ void RegisterStations(osrm::OSRM *osrm, double *coords, int numStations) {
   }
 }
 
-float *ComputeSrcToDest(osrm::OSRM *osrm, double evLon, double evLat,
-                        double destLon, double destLat, int *outSize) {
-  *outSize = 0;
+RouteResult *ComputeSrcToDest(osrm::OSRM *osrm, double evLon, double evLat,
+                              double destLon, double destLat) {
   osrm::NearestParameters evParams;
   evParams.coordinates.push_back(
       {osrm::util::FloatLongitude{evLon}, osrm::util::FloatLatitude{evLat}});
@@ -92,31 +98,31 @@ float *ComputeSrcToDest(osrm::OSRM *osrm, double evLon, double evLat,
     return nullptr;
   }
 
-  auto durationOpt = ParseRoute(routeResult);
-  if (!durationOpt) {
+  auto routeData = ParseRoute(routeResult);
+  if (!routeData) {
     return nullptr;
   }
 
-  float *ret = static_cast<float *>(malloc(sizeof(float)));
-
+  RouteResult *ret = static_cast<RouteResult *>(malloc(sizeof(RouteResult)));
   if (!ret) {
     return nullptr;
   }
 
-  *ret = *durationOpt;
-  *outSize = 1;
+  ret->duration = routeData->first;
+
+  const std::string &polylineStr = routeData->second;
+  ret->polyline = static_cast<char *>(malloc(polylineStr.size() + 1));
+  std::memcpy(ret->polyline, polylineStr.c_str(), polylineStr.size() + 1);
   return ret;
 }
 
-float *ComputeTableIndexed(osrm::OSRM *osrm, double evLon, double evLat,
-                           int *stationIndices, int numIndices, int *outSize) {
+void ComputeTableIndexed(osrm::OSRM *osrm, double evLon, double evLat,
+                         int *stationIndices, int numIndices, float *out) {
 
   osrm::TableParameters params;
-
+  params.hints.push_back(std::nullopt);
   params.coordinates.push_back(
       {osrm::util::FloatLongitude{evLon}, osrm::util::FloatLatitude{evLat}});
-
-  params.hints.push_back(std::nullopt);
 
   for (int i = 0; i < numIndices; ++i) {
     int idx = stationIndices[i];
@@ -125,27 +131,20 @@ float *ComputeTableIndexed(osrm::OSRM *osrm, double evLon, double evLat,
   }
 
   params.sources = {0};
-
   params.destinations.resize(numIndices);
+
   for (int i = 0; i < numIndices; ++i)
     params.destinations[i] = i + 1;
 
   osrm::engine::api::ResultT result;
-
   if (osrm->Table(params, result) != osrm::Status::Ok)
-    return nullptr;
+    return;
 
   auto parsed = ParseTable(result);
   if (!parsed)
-    return nullptr;
+    return;
 
-  *outSize = static_cast<int>(parsed->durations.size());
-
-  float *flat = static_cast<float *>(malloc(sizeof(float) * (*outSize)));
-
-  std::memcpy(flat, parsed->durations.data(), sizeof(float) * (*outSize));
-
-  return flat;
+  std::memcpy(out, parsed->durations.data(), sizeof(float) * numIndices);
 }
 
 void FreeMemory(void *ptr) { free(ptr); }
