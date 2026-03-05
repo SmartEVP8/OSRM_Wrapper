@@ -117,9 +117,11 @@ RouteResult *ComputeSrcToDest(osrm::OSRM *osrm, double evLon, double evLat,
 }
 
 void ComputeTableIndexed(osrm::OSRM *osrm, double evLon, double evLat,
-                         int *stationIndices, int numIndices, float *out) {
+                         int *stationIndices, int numIndices,
+                         float *outDurations, float *outDistances) {
 
   osrm::TableParameters params;
+  params.annotations = osrm::TableParameters::AnnotationsType::All; // request both durations and distances
   params.hints.push_back(std::nullopt);
   params.coordinates.push_back(
       {osrm::util::FloatLongitude{evLon}, osrm::util::FloatLatitude{evLat}});
@@ -144,11 +146,56 @@ void ComputeTableIndexed(osrm::OSRM *osrm, double evLon, double evLat,
   if (!parsed)
     return;
 
-  std::memcpy(out, parsed->durations.data(), sizeof(float) * numIndices);
+  std::memcpy(outDurations, parsed->durations.data(), sizeof(float) * numIndices);
+  std::memcpy(outDistances, parsed->distances.data(), sizeof(float) * numIndices);
 }
 
 void FreeMemory(void *ptr) { free(ptr); }
 
 void DeleteOSRM(osrm::OSRM *osrm) { delete osrm; }
+
+
+
+void PointsToPoints(osrm::OSRM *osrm, 
+                    double *srcCoords, int numSrcs,
+                    double *dstCoords, int numDsts,
+                    float *outDurations, float *outDistances) {
+
+  osrm::TableParameters params;
+  params.annotations = osrm::TableParameters::AnnotationsType::All;
+
+  for (int i = 0; i < numSrcs; ++i) {
+    params.coordinates.push_back(
+        {osrm::util::FloatLongitude{srcCoords[i * 2]},
+         osrm::util::FloatLatitude{srcCoords[i * 2 + 1]}});
+    params.hints.push_back(std::nullopt);
+  }
+
+  for (int i = 0; i < numDsts; ++i) {
+    params.coordinates.push_back(
+        {osrm::util::FloatLongitude{dstCoords[i * 2]},
+         osrm::util::FloatLatitude{dstCoords[i * 2 + 1]}});
+    params.hints.push_back(std::nullopt);
+  }
+
+  params.sources.resize(numSrcs);
+  for (int i = 0; i < numSrcs; ++i)
+    params.sources[i] = i;
+
+  params.destinations.resize(numDsts);
+  for (int i = 0; i < numDsts; ++i)
+    params.destinations[i] = numSrcs + i;
+
+  osrm::engine::api::ResultT result;
+  if (osrm->Table(params, result) != osrm::Status::Ok)
+    return;
+
+  auto parsed = ParseTable(result);
+  if (!parsed)
+    return;
+
+  std::memcpy(outDurations, parsed->durations.data(), sizeof(float) * numSrcs * numDsts);
+  std::memcpy(outDistances, parsed->distances.data(), sizeof(float) * numSrcs * numDsts);
+} 
 
 } // extern "C"

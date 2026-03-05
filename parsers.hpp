@@ -26,14 +26,15 @@ struct WaypointResult {
   osrm::util::Coordinate coord;
 };
 
-struct TableRowResult {
+struct TableResult {
   std::vector<float> durations;
+  std::vector<float> distances;
 };
 
 std::optional<WaypointResult>
 ParseNearest(const osrm::engine::api::ResultT &result);
 
-std::optional<TableRowResult>
+std::optional<TableResult>
 ParseTable(const osrm::engine::api::ResultT &result);
 
 std::optional<std::pair<float, std::string>>
