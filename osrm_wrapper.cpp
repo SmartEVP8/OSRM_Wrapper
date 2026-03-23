@@ -116,6 +116,50 @@ RouteResult *ComputeSrcToDest(osrm::OSRM *osrm, double evLon, double evLat,
   return ret;
 }
 
+RouteResult *ComputeSrcToDestWithStops(osrm::OSRM *osrm, double *coords, int numCoords) {
+  osrm::RouteParameters routeParams;
+
+  for (int i = 0; i < numCoords; ++i) {
+    double lon = coords[i * 2];
+    double lat = coords[i * 2 + 1];
+
+    osrm::NearestParameters params;
+    params.coordinates.push_back(
+        {osrm::util::FloatLongitude{lon}, osrm::util::FloatLatitude{lat}});
+    osrm::engine::api::ResultT result;
+    if (osrm->Nearest(params, result) != osrm::Status::Ok) {
+      return nullptr;
+    }
+    auto snap = ParseNearest(result);
+    if (!snap) {
+      return nullptr;
+    }
+    routeParams.coordinates.push_back(snap->coord);
+  }
+
+  osrm::engine::api::ResultT routeResult;
+  if (osrm->Route(routeParams, routeResult) != osrm::Status::Ok) {
+    return nullptr;
+  }
+
+  auto routeData = ParseRoute(routeResult);
+  if (!routeData) {
+    return nullptr;
+  }
+
+  RouteResult *ret = static_cast<RouteResult *>(malloc(sizeof(RouteResult)));
+  if (!ret) {
+    return nullptr;
+  }
+
+  ret->duration = routeData->first;
+
+  const std::string &polylineStr = routeData->second;
+  ret->polyline = static_cast<char *>(malloc(polylineStr.size() + 1));
+  std::memcpy(ret->polyline, polylineStr.c_str(), polylineStr.size() + 1);
+  return ret;
+}
+
 void ComputeTableIndexed(osrm::OSRM *osrm, double evLon, double evLat,
                          int *stationIndices, int numIndices,
                          float *outDurations, float *outDistances) {
