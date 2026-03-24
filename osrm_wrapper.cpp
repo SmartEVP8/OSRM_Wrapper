@@ -257,10 +257,11 @@ void ComputeTableIndexedWithDest(osrm::OSRM *osrm, double evLon, double evLat,
 
 void FreeMemory(void *ptr) { free(ptr); }
 
-void PointsToPoints(osrm::OSRM *osrm, 
-                    double *srcCoords, int numSrcs,
-                    double *dstCoords, int numDsts,
-                    float *outDurations, float *outDistances) {
+void DeleteOSRM(osrm::OSRM *osrm) { delete osrm; }
+
+void PointsToPoints(osrm::OSRM *osrm, double *srcCoords, int numSrcs,
+                    double *dstCoords, int numDsts, float *outDurations,
+                    float *outDistances) {
 
   osrm::TableParameters params;
   params.annotations = osrm::TableParameters::AnnotationsType::All;
@@ -295,8 +296,10 @@ void PointsToPoints(osrm::OSRM *osrm,
   if (!parsed)
     return;
 
-  std::memcpy(outDurations, parsed->durations.data(), sizeof(float) * numSrcs * numDsts);
-  std::memcpy(outDistances, parsed->distances.data(), sizeof(float) * numSrcs * numDsts);
-} 
+  std::memcpy(outDurations, parsed->durations.data(),
+              sizeof(float) * numSrcs * numDsts);
+  std::memcpy(outDistances, parsed->distances.data(),
+              sizeof(float) * numSrcs * numDsts);
+}
 
 } // extern "C"
