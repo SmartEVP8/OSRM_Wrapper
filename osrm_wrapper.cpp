@@ -18,26 +18,31 @@ struct RouteResult {
   float duration;
   char *polyline;
 };
-}
 
-static std::vector<std::optional<osrm::engine::Hint>> persistentHints;
-static std::vector<osrm::util::Coordinate> persistentCoords;
+struct InstanceState {
+  osrm::OSRM *osrm;
+  std::vector<std::optional<osrm::engine::Hint>> persistentHints;
+  std::vector<osrm::util::Coordinate> persistentCoords;
+};
+}
 
 extern "C" {
 
-osrm::OSRM *InitializeOSRM(const char *basePath) {
+InstanceState *InitializeOSRM(const char *basePath) {
   osrm::EngineConfig config;
   config.storage_config = osrm::storage::StorageConfig(basePath);
   config.use_shared_memory = false;
-  return new osrm::OSRM(config);
+
+  auto *state = new InstanceState();
+  state->osrm = new osrm::OSRM(config);
+  return state;
 }
 
-void RegisterStations(osrm::OSRM *osrm, double *coords, int numStations) {
-  persistentHints.clear();
-  persistentCoords.clear();
-
-  persistentHints.reserve(numStations);
-  persistentCoords.reserve(numStations);
+void RegisterStations(InstanceState *state, double *coords, int numStations) {
+  state->persistentHints.clear();
+  state->persistentCoords.clear();
+  state->persistentHints.reserve(numStations);
+  state->persistentCoords.reserve(numStations);
 
   for (int i = 0; i < numStations; ++i) {
 
@@ -50,28 +55,28 @@ void RegisterStations(osrm::OSRM *osrm, double *coords, int numStations) {
 
     osrm::engine::api::ResultT result;
 
-    if (osrm->Nearest(params, result) == osrm::Status::Ok) {
+    if (state->osrm->Nearest(params, result) == osrm::Status::Ok) {
       auto parsed = ParseNearest(result);
       if (parsed) {
-        persistentHints.push_back(parsed->hint);
-        persistentCoords.push_back(parsed->coord);
+        state->persistentHints.push_back(parsed->hint);
+        state->persistentCoords.push_back(parsed->coord);
         continue;
       }
     }
 
     // fallback
-    persistentHints.push_back(std::nullopt);
-    persistentCoords.push_back(input);
+    state->persistentHints.push_back(std::nullopt);
+    state->persistentCoords.push_back(input);
   }
 }
 
-RouteResult *ComputeSrcToDest(osrm::OSRM *osrm, double evLon, double evLat,
+RouteResult *ComputeSrcToDest(InstanceState *state, double evLon, double evLat,
                               double destLon, double destLat) {
   osrm::NearestParameters evParams;
   evParams.coordinates.push_back(
       {osrm::util::FloatLongitude{evLon}, osrm::util::FloatLatitude{evLat}});
   osrm::engine::api::ResultT evResult;
-  if (osrm->Nearest(evParams, evResult) != osrm::Status::Ok) {
+  if (state->osrm->Nearest(evParams, evResult) != osrm::Status::Ok) {
     return nullptr;
   }
   auto evSnap = ParseNearest(evResult);
@@ -83,7 +88,7 @@ RouteResult *ComputeSrcToDest(osrm::OSRM *osrm, double evLon, double evLat,
   destParams.coordinates.push_back({osrm::util::FloatLongitude{destLon},
                                     osrm::util::FloatLatitude{destLat}});
   osrm::engine::api::ResultT destResult;
-  if (osrm->Nearest(destParams, destResult) != osrm::Status::Ok) {
+  if (state->osrm->Nearest(destParams, destResult) != osrm::Status::Ok) {
     return nullptr;
   }
   auto destSnap = ParseNearest(destResult);
@@ -95,7 +100,7 @@ RouteResult *ComputeSrcToDest(osrm::OSRM *osrm, double evLon, double evLat,
   routeParams.coordinates.push_back(evSnap->coord);
   routeParams.coordinates.push_back(destSnap->coord);
   osrm::engine::api::ResultT routeResult;
-  if (osrm->Route(routeParams, routeResult) != osrm::Status::Ok) {
+  if (state->osrm->Route(routeParams, routeResult) != osrm::Status::Ok) {
     return nullptr;
   }
 
@@ -117,7 +122,7 @@ RouteResult *ComputeSrcToDest(osrm::OSRM *osrm, double evLon, double evLat,
   return ret;
 }
 
-RouteResult *ComputeSrcToDestWithStops(osrm::OSRM *osrm, double *coords,
+RouteResult *ComputeSrcToDestWithStops(InstanceState *state, double *coords,
                                        int numCoords) {
   osrm::RouteParameters routeParams;
 
@@ -129,7 +134,7 @@ RouteResult *ComputeSrcToDestWithStops(osrm::OSRM *osrm, double *coords,
     params.coordinates.push_back(
         {osrm::util::FloatLongitude{lon}, osrm::util::FloatLatitude{lat}});
     osrm::engine::api::ResultT result;
-    if (osrm->Nearest(params, result) != osrm::Status::Ok) {
+    if (state->osrm->Nearest(params, result) != osrm::Status::Ok) {
       return nullptr;
     }
     auto snap = ParseNearest(result);
@@ -140,7 +145,7 @@ RouteResult *ComputeSrcToDestWithStops(osrm::OSRM *osrm, double *coords,
   }
 
   osrm::engine::api::ResultT routeResult;
-  if (osrm->Route(routeParams, routeResult) != osrm::Status::Ok) {
+  if (state->osrm->Route(routeParams, routeResult) != osrm::Status::Ok) {
     return nullptr;
   }
 
@@ -162,7 +167,7 @@ RouteResult *ComputeSrcToDestWithStops(osrm::OSRM *osrm, double *coords,
   return ret;
 }
 
-void ComputeTableIndexed(osrm::OSRM *osrm, double evLon, double evLat,
+void ComputeTableIndexed(InstanceState *state, double evLon, double evLat,
                          uint16_t *stationIndices, int numIndices,
                          float *outDurations, float *outDistances) {
 
@@ -176,8 +181,8 @@ void ComputeTableIndexed(osrm::OSRM *osrm, double evLon, double evLat,
 
   for (int i = 0; i < numIndices; ++i) {
     int idx = stationIndices[i];
-    params.coordinates.push_back(persistentCoords[idx]);
-    params.hints.push_back(persistentHints[idx]);
+    params.coordinates.push_back(state->persistentCoords[idx]);
+    params.hints.push_back(state->persistentHints[idx]);
   }
 
   params.sources = {0};
@@ -187,7 +192,7 @@ void ComputeTableIndexed(osrm::OSRM *osrm, double evLon, double evLat,
     params.destinations[i] = i + 1;
 
   osrm::engine::api::ResultT result;
-  if (osrm->Table(params, result) != osrm::Status::Ok)
+  if (state->osrm->Table(params, result) != osrm::Status::Ok)
     return;
 
   auto parsed = ParseTable(result);
@@ -200,8 +205,8 @@ void ComputeTableIndexed(osrm::OSRM *osrm, double evLon, double evLat,
               sizeof(float) * numIndices);
 }
 
-void ComputeTableIndexedWithDest(osrm::OSRM *osrm, double evLon, double evLat,
-                                 double destLon, double destLat,
+void ComputeTableIndexedWithDest(InstanceState *state, double evLon,
+                                 double evLat, double destLon, double destLat,
                                  uint16_t *stationIndices, int numIndices,
                                  float *outDurations, float *outDistances) {
 
@@ -214,8 +219,8 @@ void ComputeTableIndexedWithDest(osrm::OSRM *osrm, double evLon, double evLat,
 
   for (int i = 0; i < numIndices; ++i) {
     int idx = stationIndices[i];
-    params.coordinates.push_back(persistentCoords[idx]);
-    params.hints.push_back(persistentHints[idx]);
+    params.coordinates.push_back(state->persistentCoords[idx]);
+    params.hints.push_back(state->persistentHints[idx]);
   }
 
   params.coordinates.push_back({osrm::util::FloatLongitude{destLon},
@@ -232,7 +237,7 @@ void ComputeTableIndexedWithDest(osrm::OSRM *osrm, double evLon, double evLat,
   params.destinations[numIndices] = numIndices + 1;
 
   osrm::engine::api::ResultT result;
-  if (osrm->Table(params, result) != osrm::Status::Ok)
+  if (state->osrm->Table(params, result) != osrm::Status::Ok)
     return;
 
   auto parsed = ParseTable(result);
@@ -257,9 +262,11 @@ void ComputeTableIndexedWithDest(osrm::OSRM *osrm, double evLon, double evLat,
 
 void FreeMemory(void *ptr) { free(ptr); }
 
-void DeleteOSRM(osrm::OSRM *osrm) { delete osrm; }
-
-void PointsToPoints(osrm::OSRM *osrm, double *srcCoords, int numSrcs,
+void DeleteOSRM(InstanceState *state) {
+  delete state->osrm;
+  delete state;
+}
+void PointsToPoints(InstanceState *state, double *srcCoords, int numSrcs,
                     double *dstCoords, int numDsts, float *outDurations,
                     float *outDistances) {
 
@@ -289,7 +296,7 @@ void PointsToPoints(osrm::OSRM *osrm, double *srcCoords, int numSrcs,
     params.destinations[i] = numSrcs + i;
 
   osrm::engine::api::ResultT result;
-  if (osrm->Table(params, result) != osrm::Status::Ok)
+  if (state->osrm->Table(params, result) != osrm::Status::Ok)
     return;
 
   auto parsed = ParseTable(result);
