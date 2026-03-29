@@ -16,6 +16,7 @@
 extern "C" {
 struct RouteResult {
   float duration;
+  float distance;
   char *polyline;
 };
 
@@ -114,9 +115,10 @@ RouteResult *ComputeSrcToDest(InstanceState *state, double evLon, double evLat,
     return nullptr;
   }
 
-  ret->duration = routeData->first;
+  ret->duration = std::get<0>(*routeData);
+  ret->distance = std::get<1>(*routeData);
 
-  const std::string &polylineStr = routeData->second;
+  const std::string &polylineStr = std::get<2>(*routeData);
   ret->polyline = static_cast<char *>(malloc(polylineStr.size() + 1));
   std::memcpy(ret->polyline, polylineStr.c_str(), polylineStr.size() + 1);
   return ret;
@@ -159,9 +161,10 @@ RouteResult *ComputeSrcToDestWithStops(InstanceState *state, double *coords,
     return nullptr;
   }
 
-  ret->duration = routeData->first;
+  ret->duration = std::get<0>(*routeData);
+  ret->distance = std::get<1>(*routeData);
 
-  const std::string &polylineStr = routeData->second;
+  const std::string &polylineStr = std::get<2>(*routeData);
   ret->polyline = static_cast<char *>(malloc(polylineStr.size() + 1));
   std::memcpy(ret->polyline, polylineStr.c_str(), polylineStr.size() + 1);
   return ret;
