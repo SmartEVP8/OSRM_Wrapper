@@ -34,8 +34,7 @@ struct TableResult {
 std::optional<WaypointResult>
 ParseNearest(const osrm::engine::api::ResultT &result);
 
-std::optional<TableResult>
-ParseTable(const osrm::engine::api::ResultT &result);
+std::optional<TableResult> ParseTable(const osrm::engine::api::ResultT &result);
 
-std::optional<std::pair<float, std::string>>
+std::optional<std::tuple<float, float, std::string>>
 ParseRoute(const osrm::engine::api::ResultT &result);

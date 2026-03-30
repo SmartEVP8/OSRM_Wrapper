@@ -41,7 +41,7 @@ ParseNearest(const osrm::engine::api::ResultT &result) {
   return out;
 }
 
-std::optional<std::pair<float, std::string>>
+std::optional<std::tuple<float, float, std::string>>
 ParseRoute(const osrm::engine::api::ResultT &result) {
   using namespace jsonutil;
 
@@ -64,7 +64,8 @@ ParseRoute(const osrm::engine::api::ResultT &result) {
   if (!duration || !distance || !polyline)
     return std::nullopt;
 
-  return std::make_pair(static_cast<float>(duration->value), polyline->value);
+  return std::make_tuple(static_cast<float>(duration->value),
+                         static_cast<float>(distance->value), polyline->value);
 }
 
 static std::vector<float> ParseFloatMatrix(const Array &matrix) {
@@ -72,7 +73,8 @@ static std::vector<float> ParseFloatMatrix(const Array &matrix) {
 
   for (auto const &rowVal : matrix.values) {
     auto *row = std::get_if<Array>(&rowVal);
-    if (!row) continue;
+    if (!row)
+      continue;
     for (auto const &v : row->values) {
       if (auto *num = std::get_if<Number>(&v))
         out.push_back(static_cast<float>(num->value));
@@ -96,9 +98,10 @@ ParseTable(const osrm::engine::api::ResultT &result) {
 
   auto *durations = std::get_if<Array>(&durationsIt->second);
   auto *distances = std::get_if<Array>(&distancesIt->second);
-  if (!durations || durations->values.empty() || !distances || distances->values.empty())
+  if (!durations || durations->values.empty() || !distances ||
+      distances->values.empty())
     return std::nullopt;
 
-  return TableResult{ParseFloatMatrix(*durations), ParseFloatMatrix(*distances)};
+  return TableResult{ParseFloatMatrix(*durations),
+                     ParseFloatMatrix(*distances)};
 }
-
