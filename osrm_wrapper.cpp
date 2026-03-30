@@ -123,7 +123,7 @@ RouteResult *ComputeSrcToDest(InstanceState *state, double evLon, double evLat,
 }
 
 RouteResult *ComputeSrcToDestWithStop(InstanceState *state, double *coords,
-                                       int numCoords, ushort *indices, int numIndices) {
+                                       int numCoords, ushort index) {
   osrm::RouteParameters routeParams;
 
   // Snap source (EV position) - first coordinate
@@ -142,11 +142,9 @@ RouteResult *ComputeSrcToDestWithStop(InstanceState *state, double *coords,
   routeParams.hints.push_back(srcSnap->hint);
 
   // Use pre-computed hints for intermediate station stops
-  for (int i = 0; i < numIndices; ++i) {
-    int idx = indices[i];
-    routeParams.coordinates.push_back(state->persistentCoords[idx]);
-    routeParams.hints.push_back(state->persistentHints[idx]);
-  }
+  int idx = index;
+  routeParams.coordinates.push_back(state->persistentCoords[idx]);
+  routeParams.hints.push_back(state->persistentHints[idx]);
 
   // Snap destination - last coordinate
   osrm::NearestParameters destParams;
