@@ -125,6 +125,9 @@ RouteResult *ComputeSrcToDest(InstanceState *state, double evLon, double evLat,
 RouteResult *ComputeSrcToDestWithStop(InstanceState *state, double *coords,
                                        int numCoords, ushort index) {
   osrm::RouteParameters routeParams;
+  if (index >= state->persistentCoords.size()) {
+    return nullptr;
+  }
 
   // Snap source (EV position) - first coordinate
   osrm::NearestParameters srcParams;
@@ -149,8 +152,8 @@ RouteResult *ComputeSrcToDestWithStop(InstanceState *state, double *coords,
   // Snap destination - last coordinate
   osrm::NearestParameters destParams;
   destParams.coordinates.push_back(
-      {osrm::util::FloatLongitude{coords[4]},
-       osrm::util::FloatLatitude{coords[5]}});
+      {osrm::util::FloatLongitude{coords[2]},
+       osrm::util::FloatLatitude{coords[3]}});
   osrm::engine::api::ResultT destResult;
   if (state->osrm->Nearest(destParams, destResult) != osrm::Status::Ok) {
     return nullptr;
