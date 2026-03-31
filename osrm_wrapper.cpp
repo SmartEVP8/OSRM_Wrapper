@@ -122,12 +122,9 @@ RouteResult *ComputeSrcToDest(InstanceState *state, double evLon, double evLat,
   return ret;
 }
 
-RouteResult *ComputeSrcToDestWithStop(InstanceState *state, double evLon, double evLat,
+RouteResult *ComputeSrcToDestWithStop(InstanceState *state, double evLon, double evLat, double stationLon, double stationLat,
                               double destLon, double destLat, ushort index) {
   osrm::RouteParameters routeParams;
-  if (index >= state->persistentCoords.size()) {
-    return nullptr;
-  }
 
   // Snap source (EV position) - first coordinate
   osrm::NearestParameters srcParams;
@@ -144,10 +141,28 @@ RouteResult *ComputeSrcToDestWithStop(InstanceState *state, double evLon, double
   routeParams.coordinates.push_back(srcSnap->coord);
   routeParams.hints.push_back(srcSnap->hint);
 
-  // Use pre-computed hints for intermediate station stops
-  int idx = index;
-  routeParams.coordinates.push_back(state->persistentCoords[idx]);
-  routeParams.hints.push_back(state->persistentHints[idx]);
+  if (index < state->persistentCoords.size()) {
+    // Use pre-computed hints for intermediate station stops
+    int idx = index;
+    routeParams.coordinates.push_back(state->persistentCoords[idx]);
+    routeParams.hints.push_back(state->persistentHints[idx]);
+  }
+  else {
+    // Snap intermediate station stop if index is invalid
+    osrm::NearestParameters stationParams;
+    stationParams.coordinates.push_back(
+        {osrm::util::FloatLongitude{stationLon}, osrm::util::FloatLatitude{stationLat}});
+    osrm::engine::api::ResultT stationResult;
+    if (state->osrm->Nearest(stationParams, stationResult) != osrm::Status::Ok) {
+      return nullptr;
+    }
+    auto stationSnap = ParseNearest(stationResult);
+    if (!stationSnap) {
+      return nullptr;
+    }
+    routeParams.coordinates.push_back(stationSnap->coord);
+    routeParams.hints.push_back(stationSnap->hint);
+  }
 
   // Snap destination - last coordinate
   osrm::NearestParameters destParams;
