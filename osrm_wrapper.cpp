@@ -124,27 +124,62 @@ RouteResult *ComputeSrcToDest(InstanceState *state, double evLon, double evLat,
   return ret;
 }
 
-RouteResult *ComputeSrcToDestWithStops(InstanceState *state, double *coords,
-                                       int numCoords) {
+RouteResult *ComputeSrcToDestWithStop(InstanceState *state, double evLon, double evLat, double stationLon, double stationLat,
+                              double destLon, double destLat, ushort index) {
   osrm::RouteParameters routeParams;
 
-  for (int i = 0; i < numCoords; ++i) {
-    double lon = coords[i * 2];
-    double lat = coords[i * 2 + 1];
-
-    osrm::NearestParameters params;
-    params.coordinates.push_back(
-        {osrm::util::FloatLongitude{lon}, osrm::util::FloatLatitude{lat}});
-    osrm::engine::api::ResultT result;
-    if (state->osrm->Nearest(params, result) != osrm::Status::Ok) {
-      return nullptr;
-    }
-    auto snap = ParseNearest(result);
-    if (!snap) {
-      return nullptr;
-    }
-    routeParams.coordinates.push_back(snap->coord);
+  // Snap source (EV position) - first coordinate
+  osrm::NearestParameters srcParams;
+  srcParams.coordinates.push_back(
+      {osrm::util::FloatLongitude{evLon}, osrm::util::FloatLatitude{evLat}});
+  osrm::engine::api::ResultT srcResult;
+  if (state->osrm->Nearest(srcParams, srcResult) != osrm::Status::Ok) {
+    return nullptr;
   }
+  auto srcSnap = ParseNearest(srcResult);
+  if (!srcSnap) {
+    return nullptr;
+  }
+  routeParams.coordinates.push_back(srcSnap->coord);
+  routeParams.hints.push_back(srcSnap->hint);
+
+  if (index < state->persistentCoords.size()) {
+    // Use pre-computed hints for intermediate station stops
+    int idx = index;
+    routeParams.coordinates.push_back(state->persistentCoords[idx]);
+    routeParams.hints.push_back(state->persistentHints[idx]);
+  }
+  else {
+    // Snap intermediate station stop if index is invalid
+    osrm::NearestParameters stationParams;
+    stationParams.coordinates.push_back(
+        {osrm::util::FloatLongitude{stationLon}, osrm::util::FloatLatitude{stationLat}});
+    osrm::engine::api::ResultT stationResult;
+    if (state->osrm->Nearest(stationParams, stationResult) != osrm::Status::Ok) {
+      return nullptr;
+    }
+    auto stationSnap = ParseNearest(stationResult);
+    if (!stationSnap) {
+      return nullptr;
+    }
+    routeParams.coordinates.push_back(stationSnap->coord);
+    routeParams.hints.push_back(stationSnap->hint);
+  }
+
+  // Snap destination - last coordinate
+  osrm::NearestParameters destParams;
+  destParams.coordinates.push_back(
+      {osrm::util::FloatLongitude{destLon}, osrm::util::FloatLatitude{destLat}});
+  osrm::engine::api::ResultT destResult;
+  if (state->osrm->Nearest(destParams, destResult) != osrm::Status::Ok) {
+    return nullptr;
+  }
+  auto destSnap = ParseNearest(destResult);
+  if (!destSnap) {
+    return nullptr;
+  }
+  routeParams.coordinates.push_back(destSnap->coord);
+  routeParams.hints.push_back(destSnap->hint);
 
   osrm::engine::api::ResultT routeResult;
   if (state->osrm->Route(routeParams, routeResult) != osrm::Status::Ok) {
