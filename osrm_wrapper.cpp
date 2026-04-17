@@ -218,7 +218,7 @@ RouteResult *ComputeSrcToDestWithStop(InstanceState *state, double evLon,
 void ComputeTableIndexedWithDest(InstanceState *state, double evLon,
                                  double evLat, double destLon, double destLat,
                                  uint16_t *stationIndices, int numIndices,
-                                 float *outDurations, float *outDistances) {
+                                 TableResult *outResults) {
 
   osrm::TableParameters params;
   params.annotations = osrm::TableParameters::AnnotationsType::All;
@@ -254,19 +254,23 @@ void ComputeTableIndexedWithDest(InstanceState *state, double evLon,
   if (!parsed)
     return;
 
-  // Matrix is (numIndices+1) rows x (numIndices+1) cols
-  // Row 0       = EV      → each station (cols 0..N-1) — leg 1
-  // Row i (1..N)= station → final dest   (col N)       — leg 2
+  // Matrix: (N x N) where N = Source + Stations + Destination
+  // Leg 1: Source → Station i     | Index: [Row 0, Col i]
+  // Leg 2: Station i → Destination | Index: [Row i, Col N-1]
 
-  const int cols = numIndices + 1;
-  for (int i = 0; i < numIndices; ++i) {
-    int evToStation = i;
-    int stationToDest = (i + 1) * cols + numIndices;
+  const int cols = numIndices - 1;
+  const int numStations = cols - 2;
+  const int destinationIdx = cols - 1;
 
-    outDurations[i] =
-        parsed->durations[evToStation] + parsed->durations[stationToDest];
-    outDistances[i] =
-        parsed->distances[evToStation] + parsed->distances[stationToDest];
+  for (int i = 0; i < numStations; ++i) {
+    int stationIdx = i + 1;
+    int evToStation = (0 * cols) + i;
+    int stationToDest = (stationIdx * cols) + destinationIdx;
+    
+    outResults[i].srcToStation.durations = parsed->durations[evToStation];
+    outResults[i].srcToStation.distances = parsed->distances[evToStation];
+    outResults[i].stationToDest.durations = parsed->durations[stationToDest];
+    outResults[i].stationToDest.distances = parsed->distances[stationToDest];
   }
 }
 

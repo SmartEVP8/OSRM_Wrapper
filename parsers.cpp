@@ -85,7 +85,7 @@ static std::vector<float> ParseFloatMatrix(const Array &matrix) {
   return out;
 }
 
-std::optional<TableResult>
+std::optional<TableData>
 ParseTable(const osrm::engine::api::ResultT &result) {
   auto *root = std::get_if<Object>(&result);
   if (!root)
@@ -102,6 +102,6 @@ ParseTable(const osrm::engine::api::ResultT &result) {
       distances->values.empty())
     return std::nullopt;
 
-  return TableResult{ParseFloatMatrix(*durations),
-                     ParseFloatMatrix(*distances)};
+  return TableData{ParseFloatMatrix(*durations),
+                    ParseFloatMatrix(*distances)};
 }
