@@ -258,15 +258,15 @@ void ComputeTableIndexedWithDest(InstanceState *state, double evLon,
   // Leg 1: Source → Station i     | Index: [Row 0, Col i]
   // Leg 2: Station i → Destination | Index: [Row i, Col N-1]
 
-  const int cols = numIndices - 1;
-  const int numStations = cols - 2;
+  const int cols = numIndices + 1;
+  const int numStations = numIndices;
   const int destinationIdx = cols - 1;
 
   for (int i = 0; i < numStations; ++i) {
     int stationIdx = i + 1;
-    int evToStation = (0 * cols) + i;
+    int evToStation = i;
     int stationToDest = (stationIdx * cols) + destinationIdx;
-    
+
     outResults[i].srcToStation.durations = parsed->durations[evToStation];
     outResults[i].srcToStation.distances = parsed->distances[evToStation];
     outResults[i].stationToDest.durations = parsed->durations[stationToDest];
