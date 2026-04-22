@@ -23,7 +23,6 @@ struct RouteResult {
 
 struct InstanceState {
   osrm::OSRM *osrm;
-  std::vector<std::optional<osrm::engine::Hint>> persistentHints;
   std::vector<osrm::util::Coordinate> persistentCoords;
 };
 }
@@ -42,9 +41,7 @@ InstanceState *InitializeOSRM(const char *basePath) {
 
 bool RegisterStations(InstanceState *state, double *coords, int numStations,
                       double *outSnappedCoords) {
-  state->persistentHints.clear();
   state->persistentCoords.clear();
-  state->persistentHints.reserve(numStations);
   state->persistentCoords.reserve(numStations);
 
   for (int i = 0; i < numStations; ++i) {
@@ -61,7 +58,6 @@ bool RegisterStations(InstanceState *state, double *coords, int numStations,
     if (state->osrm->Nearest(params, result) == osrm::Status::Ok) {
       auto parsed = ParseNearest(result);
       if (parsed) {
-        state->persistentHints.push_back(parsed->hint);
         state->persistentCoords.push_back(parsed->coord);
         outSnappedCoords[i * 2] =
             static_cast<double>(osrm::util::toFloating(parsed->coord.lon));
@@ -136,7 +132,6 @@ RouteResult *ComputeSrcToDestWithStop(InstanceState *state, double evLon,
                                       double destLat, ushort index) {
   osrm::RouteParameters routeParams;
 
-  // Snap source (EV position) - first coordinate
   osrm::NearestParameters srcParams;
   srcParams.coordinates.push_back(
       {osrm::util::FloatLongitude{evLon}, osrm::util::FloatLatitude{evLat}});
@@ -149,34 +144,24 @@ RouteResult *ComputeSrcToDestWithStop(InstanceState *state, double evLon,
     return nullptr;
   }
   routeParams.coordinates.push_back(srcSnap->coord);
-  routeParams.hints.push_back(srcSnap->hint);
 
   if (index < state->persistentCoords.size()) {
-    // Use pre-computed hints for intermediate station stops
-    int idx = index;
-    routeParams.coordinates.push_back(state->persistentCoords[idx]);
-    routeParams.hints.push_back(state->persistentHints[idx]);
-
+    routeParams.coordinates.push_back(state->persistentCoords[index]);
   } else {
-    // Snap intermediate station stop if index is invalid
     osrm::NearestParameters stationParams;
     stationParams.coordinates.push_back(
         {osrm::util::FloatLongitude{stationLon},
          osrm::util::FloatLatitude{stationLat}});
     osrm::engine::api::ResultT stationResult;
-    if (state->osrm->Nearest(stationParams, stationResult) !=
-        osrm::Status::Ok) {
+    if (state->osrm->Nearest(stationParams, stationResult) != osrm::Status::Ok)
       return nullptr;
-    }
     auto stationSnap = ParseNearest(stationResult);
     if (!stationSnap) {
       return nullptr;
     }
     routeParams.coordinates.push_back(stationSnap->coord);
-    routeParams.hints.push_back(stationSnap->hint);
   }
 
-  // Snap destination - last coordinate
   osrm::NearestParameters destParams;
   destParams.coordinates.push_back({osrm::util::FloatLongitude{destLon},
                                     osrm::util::FloatLatitude{destLat}});
@@ -189,7 +174,6 @@ RouteResult *ComputeSrcToDestWithStop(InstanceState *state, double evLon,
     return nullptr;
   }
   routeParams.coordinates.push_back(destSnap->coord);
-  routeParams.hints.push_back(destSnap->hint);
 
   osrm::engine::api::ResultT routeResult;
   if (state->osrm->Route(routeParams, routeResult) != osrm::Status::Ok) {
@@ -225,17 +209,14 @@ void ComputeTableIndexedWithDest(InstanceState *state, double evLon,
 
   params.coordinates.push_back(
       {osrm::util::FloatLongitude{evLon}, osrm::util::FloatLatitude{evLat}});
-  params.hints.push_back(std::nullopt);
 
   for (int i = 0; i < numIndices; ++i) {
     int idx = stationIndices[i];
     params.coordinates.push_back(state->persistentCoords[idx]);
-    params.hints.push_back(state->persistentHints[idx]);
   }
 
   params.coordinates.push_back({osrm::util::FloatLongitude{destLon},
                                 osrm::util::FloatLatitude{destLat}});
-  params.hints.push_back(std::nullopt);
 
   params.sources.resize(numIndices + 1);
   for (int i = 0; i <= numIndices; ++i)
@@ -259,10 +240,9 @@ void ComputeTableIndexedWithDest(InstanceState *state, double evLon,
   // Leg 2: Station i → Destination | Index: [Row i, Col N-1]
 
   const int cols = numIndices + 1;
-  const int numStations = numIndices;
   const int destinationIdx = cols - 1;
 
-  for (int i = 0; i < numStations; ++i) {
+  for (int i = 0; i < numIndices; ++i) {
     int stationIdx = i + 1;
     int evToStation = i;
     int stationToDest = (stationIdx * cols) + destinationIdx;
@@ -280,6 +260,7 @@ void DeleteOSRM(InstanceState *state) {
   delete state->osrm;
   delete state;
 }
+
 void PointsToPoints(InstanceState *state, double *srcCoords, int numSrcs,
                     double *dstCoords, int numDsts, float *outDurations,
                     float *outDistances) {
@@ -291,14 +272,12 @@ void PointsToPoints(InstanceState *state, double *srcCoords, int numSrcs,
     params.coordinates.push_back(
         {osrm::util::FloatLongitude{srcCoords[i * 2]},
          osrm::util::FloatLatitude{srcCoords[i * 2 + 1]}});
-    params.hints.push_back(std::nullopt);
   }
 
   for (int i = 0; i < numDsts; ++i) {
     params.coordinates.push_back(
         {osrm::util::FloatLongitude{dstCoords[i * 2]},
          osrm::util::FloatLatitude{dstCoords[i * 2 + 1]}});
-    params.hints.push_back(std::nullopt);
   }
 
   params.sources.resize(numSrcs);
