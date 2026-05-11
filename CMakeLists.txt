@@ -21,7 +21,22 @@ FetchContent_Declare(
 )
 
 FetchContent_MakeAvailable(osrm_backend)
+# Persistently add a small compatibility source into the OSRM backend target
+set(OSRM_LUA_COMPAT_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/compat/lua_compat.cpp")
+if(EXISTS "${OSRM_LUA_COMPAT_SRC}")
+  if(TARGET osrm)
+    target_sources(osrm PRIVATE "${OSRM_LUA_COMPAT_SRC}")
+  elseif(TARGET osrm::osrm)
+    target_sources(osrm::osrm PRIVATE "${OSRM_LUA_COMPAT_SRC}")
+  endif()
+endif()
 
+# Ensure osrm's io-benchmark target includes <unistd.h> on GCC/Clang/Linux
+if(NOT WIN32 AND (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang"))
+  if(TARGET osrm-io-benchmark)
+    target_compile_options(osrm-io-benchmark PRIVATE -include unistd.h)
+  endif()
+endif()
 
 add_library(osrm_wrapper SHARED
   osrm_wrapper.cpp
