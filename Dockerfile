@@ -1,20 +1,16 @@
 FROM ubuntu:24.04 AS osrm-builder
 
 RUN apt-get update && apt-get install -y \
-    build-essential cmake git \
-    libboost-all-dev \
-    libtbb-dev \
-    liblua5.4-dev \
-    libluajit-5.1-dev \
+    build-essential \
+    cmake \
+    pkg-config \
+    libbz2-dev \
     libxml2-dev \
     libzip-dev \
-    libbz2-dev \
     libexpat1-dev \
-    libstxxl-dev \
-    libosmium2-dev \
-    libprotozero-dev \
-    libzmq3-dev \
-    pkg-config \
+    libboost-all-dev \
+    liblua5.4-dev \
+    libtbb-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
