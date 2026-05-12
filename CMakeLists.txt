@@ -1,6 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
 project(osrm_wrapper LANGUAGES CXX)
-
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -8,35 +7,26 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
-# OSRM dependencies
+if(POLICY CMP0167)
+  cmake_policy(SET CMP0167 NEW)
+endif()
+
 find_package(Boost REQUIRED COMPONENTS iostreams filesystem thread)
 find_package(Threads REQUIRED)
 
-# Fetch OSRM backend and build it as a dependency
-include(FetchContent)
-FetchContent_Declare(
-  osrm_backend
-  GIT_REPOSITORY https://github.com/Project-OSRM/osrm-backend.git
-  GIT_TAG 362b388d7e0582291662105d7bfc004a3a44a393
+find_path(OSRM_INCLUDE_DIR NAMES osrm/osrm.hpp
+  PATHS /usr/local/include /usr/include
+)
+find_library(OSRM_LIBRARY NAMES osrm
+  PATHS /usr/local/lib /usr/lib
 )
 
-FetchContent_MakeAvailable(osrm_backend)
-# Persistently add a small compatibility source into the OSRM backend target
-set(OSRM_LUA_COMPAT_SRC "${CMAKE_CURRENT_SOURCE_DIR}/src/compat/lua_compat.cpp")
-if(EXISTS "${OSRM_LUA_COMPAT_SRC}")
-  if(TARGET osrm)
-    target_sources(osrm PRIVATE "${OSRM_LUA_COMPAT_SRC}")
-  elseif(TARGET osrm::osrm)
-    target_sources(osrm::osrm PRIVATE "${OSRM_LUA_COMPAT_SRC}")
-  endif()
+if(NOT OSRM_INCLUDE_DIR OR NOT OSRM_LIBRARY)
+  message(FATAL_ERROR "Could not find OSRM. Run the prepare script first.")
 endif()
 
-# Ensure osrm's io-benchmark target includes <unistd.h> on GCC/Clang/Linux
-if(NOT WIN32 AND (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang"))
-  if(TARGET osrm-io-benchmark)
-    target_compile_options(osrm-io-benchmark PRIVATE -include unistd.h)
-  endif()
-endif()
+message(STATUS "Found OSRM: ${OSRM_LIBRARY}")
+message(STATUS "OSRM include: ${OSRM_INCLUDE_DIR}")
 
 add_library(osrm_wrapper SHARED
   osrm_wrapper.cpp
@@ -44,18 +34,17 @@ add_library(osrm_wrapper SHARED
 )
 
 target_include_directories(osrm_wrapper PRIVATE
-    ${osrm_backend_SOURCE_DIR}/include
-    ${osrm_backend_SOURCE_DIR}/include/osrm
-    ${osrm_backend_SOURCE_DIR}/third_party/flatbuffers/include
-    ${osrm_backend_SOURCE_DIR}/third_party/variant/include
-    ${osrm_backend_SOURCE_DIR}/third_party/stxxl/include
-    ${Boost_INCLUDE_DIRS}
+  ${OSRM_INCLUDE_DIR}
+  ${OSRM_INCLUDE_DIR}/osrm
+  ${Boost_INCLUDE_DIRS}
 )
 
 target_link_libraries(osrm_wrapper PRIVATE
-    osrm
-    ${Boost_LIBRARIES}
-    Threads::Threads
+  ${OSRM_LIBRARY}
+  Boost::iostreams
+  Boost::filesystem
+  Boost::thread
+  Threads::Threads
 )
 
 if(WIN32)
