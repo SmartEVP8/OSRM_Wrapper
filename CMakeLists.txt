@@ -7,10 +7,6 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
-if(POLICY CMP0167)
-  cmake_policy(SET CMP0167 NEW)
-endif()
-
 find_package(Boost REQUIRED COMPONENTS iostreams filesystem thread)
 find_package(Threads REQUIRED)
 
@@ -46,7 +42,3 @@ target_link_libraries(osrm_wrapper PRIVATE
   Boost::thread
   Threads::Threads
 )
-
-if(WIN32)
-  set_target_properties(osrm_wrapper PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
-endif()
